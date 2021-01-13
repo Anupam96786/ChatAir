@@ -239,7 +239,7 @@
 
 <body>
 
-    <script id="room-name" type="application/json">"a"</script>
+    {{ room_name|json_script:"room-name" }}
 
     <!-- <script id="username" type="application/json">""</script> -->
     {{ username|json_script:"username" }}

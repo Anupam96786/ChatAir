@@ -1,34 +1,60 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.db import database_sync_to_async
+from .models import ChatRoom
+from django.contrib.auth.models import User
+
+
+@database_sync_to_async
+def get_user(user_id):
+    try:
+        return User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return AnonymousUser()
+
+
+@database_sync_to_async
+def get_room(room_id):
+    try:
+        chatroom = ChatRoom.objects.get(roomId=room_id.replace('_', '-'))
+        return [chatroom.user1, chatroom.user2]
+    except:
+        return []
+
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.room_name = self.scope['url_route']['kwargs']['room_name']
-        self.room_group_name = self.room_name
 
-        # Join room group
-        await self.channel_layer.group_add(
-            self.room_group_name,
-            self.channel_name
-        )
+        if self.scope['user'].is_anonymous:
+            await self.close()
+        else:
+            users = await get_room(self.room_name)
+            if self.scope['user'] in users:
 
-        await self.accept()
+                # Join room group
+                await self.channel_layer.group_add(self.room_name, self.channel_name)
+
+                await self.accept()
+            else:
+                await self.close()
+        
 
     async def disconnect(self, close_code):
         # Leave room group
-        await self.channel_layer.group_discard(
-            self.room_group_name,
-            self.channel_name
-        )
+        await self.channel_layer.group_discard(self.room_name, self.channel_name)
 
     # Receive message from WebSocket
     async def receive(self, text_data):
         text_data_json = json.loads(text_data)
         message = text_data_json['message']
+        # this data to be saved in database in new model
+        # self.room_name
+        # message
 
         # Send message to room group
         await self.channel_layer.group_send(
-            self.room_group_name,
+            self.room_name,
             {
                 'type': 'chat_message',
                 'message': message,

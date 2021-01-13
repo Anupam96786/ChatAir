@@ -6,6 +6,6 @@ def index(request):
 
 def room(request, room_name):
     return render(request, 'a.html', {
-        'room_name': room_name,
+        'room_name': room_name.replace('-', '_'),
         'username': request.user.username
     })
