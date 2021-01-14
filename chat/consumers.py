@@ -1,7 +1,7 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from .models import ChatRoom
+from .models import ChatRoom, ChatRoomMessage
 from django.contrib.auth.models import User
 
 
@@ -14,12 +14,21 @@ def get_user(user_id):
 
 
 @database_sync_to_async
-def get_room(room_id):
+def get_room_users(room_id):
     try:
-        chatroom = ChatRoom.objects.get(roomId=room_id.replace('_', '-'))
+        chatroom = ChatRoom.objects.get(id=room_id)
         return [chatroom.user1, chatroom.user2]
     except:
         return []
+
+
+@database_sync_to_async
+def save_room_message(room_id, message, sent_by):
+    # try:
+    chatroom = ChatRoom.objects.get(id=room_id)
+    ChatRoomMessage.objects.create(room = chatroom, sent_by=sent_by, message=message)
+    # except:
+    #     pass
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -29,7 +38,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if self.scope['user'].is_anonymous:
             await self.close()
         else:
-            users = await get_room(self.room_name)
+            users = await get_room_users(self.room_name)
             if self.scope['user'] in users:
 
                 # Join room group
@@ -38,19 +47,20 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 await self.accept()
             else:
                 await self.close()
-        
+
 
     async def disconnect(self, close_code):
         # Leave room group
         await self.channel_layer.group_discard(self.room_name, self.channel_name)
 
+
     # Receive message from WebSocket
     async def receive(self, text_data):
         text_data_json = json.loads(text_data)
         message = text_data_json['message']
-        # this data to be saved in database in new model
-        # self.room_name
-        # message
+
+        # saving the messages to the database
+        await save_room_message(self.room_name, message, self.scope['user'])
 
         # Send message to room group
         await self.channel_layer.group_send(
@@ -61,6 +71,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'username': self.scope['user'].username
             }
         )
+
 
     # Receive message from room group
     async def chat_message(self, event):
