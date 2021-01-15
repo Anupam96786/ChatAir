@@ -21,13 +21,4 @@ def index(request):
 
 
 def room(request, room_name):
-    try:
-        if request.user in get_room_users(room_name):
-            messages = get_messages(room_name)
-            return render(request, 'a.html', {
-                'room_name': room_name,
-            })
-        else:
-            return HttpResponse('you are not allowed...')
-    except:
-        return HttpResponse('you are not allowed...')
+    return render(request, 'a.html', {'room_name': room_name})

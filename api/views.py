@@ -1,10 +1,11 @@
 from django.shortcuts import render
 from rest_framework.pagination import PageNumberPagination
-from chat.models import ChatRoomMessage
+from chat.models import ChatRoomMessage, ChatRoom
 from rest_framework.generics import ListAPIView
 from rest_framework.views import APIView
 from . import serializers
 from rest_framework.response import Response
+from django.db.models import Q
 
 
 class StandardResultsSetPagination(PageNumberPagination):
@@ -27,5 +28,6 @@ class MessageRecordsView(ListAPIView):
     serializer_class = serializers.ChatMessageSerializer
 
 
-# class GetContacts(APIView):
-    
+class GetContacts(APIView):
+    def get(self, request):
+        return Response(data={'results': ChatRoom.objects.filter(Q(user1=request.user) | Q(user2=request.user)).values_list('id', 'user1__username', 'user2__username')})
