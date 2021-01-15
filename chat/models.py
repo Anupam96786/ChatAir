@@ -29,3 +29,4 @@ class ChatRoomMessage(models.Model):
     room = models.ForeignKey(ChatRoom, on_delete=models.CASCADE, editable=False)
     sent_by = models.ForeignKey(User, on_delete=models.CASCADE, blank=False, null=False)
     message = models.TextField(blank=False, null=False)
+    timestamp = models.DateTimeField(auto_now=True)

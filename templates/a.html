@@ -295,8 +295,7 @@
         crossorigin="anonymous"></script>
 
     <script>
-        var Message;
-        Message = function (arg) {
+        var Message = function (arg) {
             this.text = arg.text, this.message_side = arg.message_side;
             this.draw = function (_this) {
                 return function () {
@@ -309,16 +308,25 @@
                     }, 0);
                 };
             }(this);
+            this.predraw = function (_this) {
+                return function () {
+                    var $message;
+                    $message = $($('.message_template').clone().html());
+                    $message.addClass(_this.message_side).find('.text').html(_this.text);
+                    $('.messages').prepend($message);
+                    return setTimeout(function () {
+                        return $message.addClass('appeared');
+                    }, 0);
+                };
+            }(this);
             return this;
         };
-        var getMessageText, message_side, sendMessage;
-        message_side = 'right';
-        getMessageText = function () {
+        var getMessageText = function () {
             var $message_input;
             $message_input = $('.message_input');
             return $message_input.val();
         };
-        sendMessage = function (text, message_side = "right") {
+        var sendMessage = function (text, message_side = "right",previous=false) {
             var $messages, message;
             if (text.trim() === '') {
                 return;
@@ -329,38 +337,48 @@
                 text: text,
                 message_side: message_side
             });
-            message.draw();
-            message_side = message_side === 'left' ? 'right' : 'left';
-            return $messages.animate({ scrollTop: $messages.prop('scrollHeight') }, 300);
+            if(previous)message.predraw();
+            else{
+                message.draw();
+                return $messages.animate({ scrollTop: $messages.prop('scrollHeight') }, 300);
+            }
         };
-
         const roomName = JSON.parse(document.getElementById('room-name').textContent);
-        // const username = JSON.parse(document.getElementById('username').textContent);
-
+        const username = '{{ request.user.username }}';
         if (location.protocol === 'https:') {
             var protocol = 'wss://'
         }
         else {
             var protocol = 'ws://'
         }
+        var chatSocket;
 
-        const chatSocket = new WebSocket(protocol + window.location.host + '/ws/chat/' + roomName + '/');
-
-        chatSocket.onmessage = function (e) {
-            const data = JSON.parse(e.data);
-            const username = '{{ request.user.username }}';
+        function onmessage(event) {
+            const data = JSON.parse(event.data);
             if (username == data.username) {
                 sendMessage(`<b>${data.username}</b><br>${data.message}`)
             }
             else {
                 sendMessage(`<b>${data.username}</b><br>${data.message}`, 'left')
             }
-        };
+        }
 
-        chatSocket.onclose = function (e) {
-            console.error('Chat socket closed unexpectedly');
-        };
-
+        var chatSocket=start(protocol + window.location.host + '/ws/chat/' + roomName + '/',onmessage)
+        function start(websocketServerLocation,onMessage) {
+            this.ws = new WebSocket(websocketServerLocation);
+            this.ws.onmessage = (event) => onMessage(event);
+            this.ws.onclose = function () {
+                console.error('Chat socket closed unexpectedly...');
+                ws=null;
+                // Try to reconnect in 5 seconds
+                setTimeout(function () { 
+                    console.log('Trying to reconnect...');
+                    ws=null;
+                    chatSocket=start(websocketServerLocation,onmessage);
+                 }, 5000);
+            };
+            return ws;
+        }
         $('.send_message').click(function (e) {
             const message = getMessageText();
             chatSocket.send(JSON.stringify({
@@ -369,6 +387,7 @@
             }));
             return;
         });
+
         $('.message_input').keyup(function (e) {
             if (e.which === 13) {
                 const message = getMessageText();
@@ -380,14 +399,25 @@
             }
         });
     </script>
+
     <script>
+
         $(document).ready(function () {
             $.ajax({
-                url: location.protocol + "//127.0.0.1:8000/api/messages/" + roomName,
+                url: "/api/messages/" + roomName,
                 type: "GET",
                 data: { "page": 1 },
-                success: function (result) {
-                    console.log(result);
+                success: function (res) {
+                    console.log(res);
+                    for(i=0;i<res['results'].length;i++){
+                        if (res['results'][i]['sent_by'] == username) {
+                            sendMessage(`<b>${res['results'][i]['sent_by']}</b><br>${res['results'][i]['message']}`,'right',true)
+                        }
+                        else {
+                            sendMessage(`<b>${res['results'][i]['sent_by']}</b><br>${res['results'][i]['message']}`, 'left',true)
+                        }
+                    }
+                    $('.messages').animate({ scrollTop: $('.messages').prop('scrollHeight') }, 300)
                 },
                 error: function (error) {
                     console.log(error);
