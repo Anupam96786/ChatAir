@@ -18,9 +18,6 @@ class ChatRoom(models.Model):
 
 
 class ChatRoomMessage(models.Model):
-    """
-    docstring
-    """
     room = models.ForeignKey(ChatRoom, on_delete=models.CASCADE, editable=False)
     sent_by = models.ForeignKey(User, on_delete=models.CASCADE, blank=False, null=False)
     message = models.TextField(blank=False, null=False)

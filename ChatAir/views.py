@@ -26,7 +26,6 @@ def room(request, room_name):
             messages = get_messages(room_name)
             return render(request, 'a.html', {
                 'room_name': room_name,
-                'messages': messages
             })
         else:
             return HttpResponse('you are not allowed...')
